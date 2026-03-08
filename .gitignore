@@ -1,0 +1,55 @@
+# .NET / C#
+bin/
+obj/
+[Bb]uild/
+[Dd]ebug/
+[Rr]elease/
+*.dll
+*.exe
+*.pdb
+*.cache
+*.user
+*.userosscache
+*.suo
+*.userprefs
+*.nupkg
+*.snupkg
+project.lock.json
+project.fragment.lock.json
+artifacts/
+
+# Visual Studio
+.vs/
+*.rsuser
+*.suo
+*.user
+*.sln.docstates
+
+# Rider
+.idea/
+*.sln.iml
+
+# VS Code
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+*.code-workspace
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+*.lnk
+
+# NuGet
+packages/
+*.nupkg
+*.snupkg
+.nuget/
+
+# Logs
+*.log
+logs/
