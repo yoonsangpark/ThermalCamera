@@ -14,6 +14,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Content Include="Flir.png" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Condition="Exists('Flir.png')" />
+    <Content Include="tessdata\eng.traineddata" CopyToOutputDirectory="PreserveNewest" Link="tessdata\eng.traineddata" Condition="Exists('tessdata\eng.traineddata')" />
+  </ItemGroup>
+  <ItemGroup>
     <PackageReference Include="AForge.Video" Version="2.2.5" />
     <PackageReference Include="AForge.Video.DirectShow" Version="2.2.5" />
     <PackageReference Include="Tesseract" Version="5.2.0" />

@@ -12,12 +12,18 @@ USB 열화상 카메라에서 영상을 가져와 좌측 상단의 고정 길이
 
 온도 텍스트 인식을 위해 **Tesseract** 영어 데이터가 필요합니다.
 
-1. [tesseract-ocr/tessdata](https://github.com/tesseract-ocr/tessdata) 에서 `eng.traineddata` 다운로드
-2. 실행 파일과 같은 위치에 `tessdata` 폴더를 만들고 그 안에 `eng.traineddata` 넣기  
-   - 예: `ThermalCamera\bin\Debug\net8.0-windows\tessdata\eng.traineddata`
-3. 또는 `SThermalCamera.TessDataPath`에 tessdata 폴더 경로를 지정
+**방법 1 – 스크립트로 다운로드 (권장)**
+```powershell
+.\scripts\download-tessdata.ps1
+```
+프로젝트 폴더에 `tessdata\eng.traineddata`가 생성됩니다. 빌드 시 출력 폴더로 자동 복사됩니다.
 
-tessdata가 없으면 카메라는 동작하지만 온도 인식 결과는 나오지 않습니다.
+**방법 2 – 수동 설치**
+1. [tesseract-ocr/tessdata](https://github.com/tesseract-ocr/tessdata) 에서 `eng.traineddata` 다운로드
+2. 프로젝트 폴더에 `tessdata` 폴더를 만들고 그 안에 `eng.traineddata` 저장  
+   - 예: `c:\ws\ThermalCamera\tessdata\eng.traineddata`
+
+tessdata가 없으면 로그에 `[OCR] tessdata 미발견` 메시지가 표시됩니다.
 
 ## 빌드 및 실행
 

@@ -27,8 +27,11 @@ public class SThermalCamera
     /// <summary>카메라 연결 여부</summary>
     public bool IsConnected => _captureDevice?.IsRunning ?? false;
 
-    /// <summary>tessdata 경로 (OCR 언어 데이터). null이면 실행 파일 기준 "tessdata"</summary>
+    /// <summary>tessdata 경로 (OCR 언어 데이터). null이면 자동 탐색</summary>
     public string? TessDataPath { get; set; }
+
+    /// <summary>디버그 로그 (tessdata 경로, OCR 원문 등). null이면 로그 없음</summary>
+    public Action<string>? OnDebugLog { get; set; }
 
     /// <summary>
     /// 사용 가능한 USB 비디오 장치 목록 반환
@@ -144,26 +147,45 @@ public class SThermalCamera
     {
         if (image == null) return null;
         EnsureOcrEngine();
-        if (_ocrEngine == null) return null;
+        if (_ocrEngine == null)
+        {
+            OnDebugLog?.Invoke("OCR 엔진 초기화 실패: tessdata 폴더를 찾을 수 없습니다.");
+            return null;
+        }
 
-        // 좌측 상단 영역만 크롭 (전체의 약 25% 너비, 15% 높이)
-        int cropW = Math.Max(80, Math.Min(400, image.Width / 4));
-        int cropH = Math.Max(40, Math.Min(120, image.Height / 6));
+        // 좌측 상단 영역 크롭 (전체의 약 30% 너비, 20% 높이) - 온도 텍스트 영역
+        int cropW = Math.Max(120, Math.Min(500, image.Width * 3 / 10));
+        int cropH = Math.Max(60, Math.Min(180, image.Height / 5));
         using var crop = new Bitmap(cropW, cropH);
         using (var g = Graphics.FromImage(crop))
         {
+            g.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBicubic;
             g.DrawImage(image, 0, 0, new Rectangle(0, 0, cropW, cropH), GraphicsUnit.Pixel);
+        }
+
+        // OCR 정확도 향상: 2배 스케일업 (작은 텍스트 인식 개선)
+        const int scale = 2;
+        using var scaled = new Bitmap(cropW * scale, cropH * scale);
+        using (var g = Graphics.FromImage(scaled))
+        {
+            g.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.NearestNeighbor;
+            g.PixelOffsetMode = System.Drawing.Drawing2D.PixelOffsetMode.Half;
+            g.DrawImage(crop, 0, 0, scaled.Width, scaled.Height);
         }
 
         try
         {
-            using var pix = BitmapToPix(crop);
+            using var pix = BitmapToPix(scaled);
             using var page = _ocrEngine.Process(pix);
-            var text = page.GetText();
-            return ParseTemperatureFromText(text);
+            var text = page.GetText()?.Trim() ?? "";
+            var temp = ParseTemperatureFromText(text);
+            if (!temp.HasValue && !string.IsNullOrEmpty(text))
+                OnDebugLog?.Invoke($"OCR 원문: \"{text}\" → 온도 파싱 실패");
+            return temp;
         }
-        catch
+        catch (Exception ex)
         {
+            OnDebugLog?.Invoke($"OCR 오류: {ex.Message}");
             return null;
         }
     }
@@ -188,11 +210,26 @@ public class SThermalCamera
     public static double? ParseTemperatureFromText(string? text)
     {
         if (string.IsNullOrWhiteSpace(text)) return null;
-        // 고정 길이 실수: 예 21.2, 36.0, 20.9
-        var match = Regex.Match(text, @"(\d{1,3}\.\d)\s*(°C|C)?", RegexOptions.IgnoreCase);
-        if (match.Success && double.TryParse(match.Groups[1].Value, System.Globalization.NumberStyles.Any,
-                System.Globalization.CultureInfo.InvariantCulture, out var value))
-            return value;
+        // 고정 길이 실수: 21.2 °C, 36.0, 21,2 등 다양한 형식
+        var patterns = new[] { @"(\d{1,3}[.,]\d)", @"(\d{1,3}\.\d)\s*", @"(\d{1,3})[.,](\d)" };
+        foreach (var pat in patterns)
+        {
+            var m = Regex.Match(text, pat);
+            if (!m.Success) continue;
+            var num = m.Groups.Count > 2
+                ? $"{m.Groups[1].Value}.{m.Groups[2].Value}"
+                : m.Groups[1].Value.Replace(',', '.');
+            if (double.TryParse(num, System.Globalization.NumberStyles.Any,
+                    System.Globalization.CultureInfo.InvariantCulture, out var value) && value is > -50 and < 200)
+                return value;
+        }
+        // OCR이 소수점 누락한 경우: "212" -> 21.2, "360" -> 36.0
+        var intMatch = Regex.Match(text, @"(\d{2,3})\b");
+        if (intMatch.Success && int.TryParse(intMatch.Groups[1].Value, out var intVal))
+        {
+            var withDecimal = intVal / 10.0;
+            if (withDecimal is >= 5 and <= 60) return withDecimal; // 일반 열화상 범위
+        }
         return null;
     }
 
@@ -200,18 +237,44 @@ public class SThermalCamera
     {
         if (_ocrInitialized) return;
         _ocrInitialized = true;
+        var baseDir = AppContext.BaseDirectory;
+        var candidates = new[]
+        {
+            TessDataPath,
+            Path.Combine(baseDir, "tessdata"),
+            Path.Combine(baseDir, "..", "tessdata"),
+            Path.Combine(baseDir, "..", "..", "tessdata"),
+            Path.Combine(baseDir, "..", "..", "..", "tessdata"),
+            Path.Combine(Directory.GetCurrentDirectory(), "tessdata"),
+            Path.Combine(Path.GetDirectoryName(Environment.ProcessPath) ?? "", "tessdata"),
+        }.Where(p => !string.IsNullOrEmpty(p)).Distinct();
+
+        string? dataPath = null;
+        foreach (var p in candidates)
+        {
+            if (p != null && Directory.Exists(p) && File.Exists(Path.Combine(p, "eng.traineddata")))
+            {
+                dataPath = Path.GetFullPath(p);
+                break;
+            }
+        }
+
+        if (dataPath == null)
+        {
+            var searched = string.Join(", ", candidates.Where(p => p != null));
+            OnDebugLog?.Invoke($"tessdata 미발견. eng.traineddata가 있는 tessdata 폴더가 필요합니다. 탐색 경로: {searched}");
+            return;
+        }
+
         try
         {
-            var dataPath = TessDataPath ?? Path.Combine(AppContext.BaseDirectory, "tessdata");
-            if (!Directory.Exists(dataPath))
-                dataPath = Path.Combine(AppContext.BaseDirectory, "..", "tessdata");
-            if (!Directory.Exists(dataPath))
-                return;
             _ocrEngine = new TesseractEngine(dataPath, "eng", EngineMode.Default);
-            _ocrEngine.SetVariable("tessedit_char_whitelist", "0123456789.°C ");
+            _ocrEngine.SetVariable("tessedit_char_whitelist", "0123456789. °Cc"); // °C 지원
+            OnDebugLog?.Invoke($"OCR 초기화됨: {dataPath}");
         }
-        catch
+        catch (Exception ex)
         {
+            OnDebugLog?.Invoke($"Tesseract 초기화 오류: {ex.Message}");
             _ocrEngine = null;
         }
     }

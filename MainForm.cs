@@ -9,6 +9,7 @@ public partial class MainForm : Form
     {
         InitializeComponent();
         _log.SetRichTextBox(richTextBoxLog);
+        _camera.OnDebugLog = s => _log.Info($"[OCR] {s}");
     }
 
     private void MainForm_Load(object? sender, EventArgs e)
@@ -55,6 +56,49 @@ public partial class MainForm : Form
     {
         _camera.Disconnect();
         _log.Info("카메라 연결 해제됨.");
+    }
+
+    private void btnRecognizeFlir_Click(object? sender, EventArgs e)
+    {
+        var paths = new[]
+        {
+            Path.Combine(AppContext.BaseDirectory, "Flir.png"),
+            Path.Combine(AppContext.BaseDirectory, "..", "Flir.png"),
+            Path.Combine(AppContext.BaseDirectory, "..", "..", "Flir.png"),
+            Path.Combine(Directory.GetCurrentDirectory(), "Flir.png"),
+        };
+        string? path = null;
+        foreach (var p in paths)
+        {
+            if (File.Exists(p)) { path = Path.GetFullPath(p); break; }
+        }
+        if (path == null)
+        {
+            _log.Error("Flir.png를 찾을 수 없습니다. 프로젝트 폴더에 Flir.png를 넣어주세요.");
+            return;
+        }
+        try
+        {
+            using var bmp = new Bitmap(path);
+            var temperature = _camera.RecognizeTemperatureFromImage(bmp);
+            var old = pictureBoxPreview.Image;
+            pictureBoxPreview.Image = new Bitmap(bmp);
+            old?.Dispose();
+            if (temperature.HasValue)
+            {
+                textBoxTemperature.Text = $"{temperature.Value:F1} °C";
+                _log.Info($"Flir.png 온도 인식: {temperature.Value:F1} °C");
+            }
+            else
+            {
+                textBoxTemperature.Text = "—";
+                _log.Warn("온도값 인식 실패. tessdata(OCR) 경로와 이미지 좌측상단 영역을 확인하세요.");
+            }
+        }
+        catch (Exception ex)
+        {
+            _log.Error($"Flir.png 로드/인식 오류: {ex.Message}");
+        }
     }
 
     private void btnCaptureAndRecognize_Click(object? sender, EventArgs e)

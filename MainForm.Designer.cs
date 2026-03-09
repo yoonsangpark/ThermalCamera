@@ -64,13 +64,24 @@ partial class MainForm
         btnCaptureAndRecognize.Size = new Size(260, 28);
         btnCaptureAndRecognize.TabIndex = 3;
         btnCaptureAndRecognize.Text = "Image 가져오기 및 온도 인식";
+        //
+        // btnRecognizeFlir
+        //
+        btnRecognizeFlir = new Button();
+        btnRecognizeFlir.Location = new Point(12, 196);
+        btnRecognizeFlir.Name = "btnRecognizeFlir";
+        btnRecognizeFlir.Size = new Size(260, 28);
+        btnRecognizeFlir.TabIndex = 10;
+        btnRecognizeFlir.Text = "Flir.png에서 온도 인식";
+        btnRecognizeFlir.UseVisualStyleBackColor = true;
+        btnRecognizeFlir.Click += btnRecognizeFlir_Click;
         btnCaptureAndRecognize.UseVisualStyleBackColor = true;
         btnCaptureAndRecognize.Click += btnCaptureAndRecognize_Click;
         //
         // textBoxTemperature
         //
         textBoxTemperature.Font = new Font("Segoe UI", 12F, FontStyle.Bold);
-        textBoxTemperature.Location = new Point(12, 218);
+        textBoxTemperature.Location = new Point(12, 244);
         textBoxTemperature.Name = "textBoxTemperature";
         textBoxTemperature.ReadOnly = true;
         textBoxTemperature.Size = new Size(260, 29);
@@ -100,7 +111,7 @@ partial class MainForm
         // labelTemperature
         //
         labelTemperature.AutoSize = true;
-        labelTemperature.Location = new Point(12, 200);
+        labelTemperature.Location = new Point(12, 226);
         labelTemperature.Name = "labelTemperature";
         labelTemperature.Size = new Size(58, 15);
         labelTemperature.TabIndex = 7;
@@ -138,6 +149,7 @@ partial class MainForm
         Controls.Add(labelCameras);
         Controls.Add(richTextBoxLog);
         Controls.Add(textBoxTemperature);
+        Controls.Add(btnRecognizeFlir);
         Controls.Add(btnCaptureAndRecognize);
         Controls.Add(btnDisconnect);
         Controls.Add(btnConnect);
@@ -165,4 +177,5 @@ partial class MainForm
     private Label labelTemperature;
     private Label labelLog;
     private PictureBox pictureBoxPreview;
+    private Button btnRecognizeFlir;
 }
